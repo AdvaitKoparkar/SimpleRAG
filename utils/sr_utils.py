@@ -3,10 +3,10 @@ import json
 import hashlib
 import urllib.request
 from datetime import datetime
-from sqlitedict import SqliteDict
 
 from config import SIMPLERAG_PATHS
 from config import GNEWS_API_KEY
+from config import OPENAI_API_KEY
 
 class GNewsDownloader():
     _API_KEY = GNEWS_API_KEY
@@ -42,11 +42,36 @@ class GNewsDownloader():
                     db[article_hash] = article
                 db.commit()
 
+class InterestedEntityManager:
+    _USER_TAGS_DB = os.path.join(SIMPLERAG_PATHS['PROJ_DIR'], SIMPLERAG_PATHS['DATA_PATH'], 'user_ne.db')
+    def __init__(self, ):
+        pass
+
+
+
 if __name__ == "__main__":
+    import os
+    os.environ['OPENAI_API_KEY'] = OPENAI_API_KEY
+
+    import faiss
+    from sqlitedict import SqliteDict
+    from llama_index.core import VectorStoreIndex
+    from llama_index.readers.web import BeautifulSoupWebReader
+    from llama_index.core import StorageContext
+    from llama_index.vector_stores.faiss import FaissVectorStore
+
     import ssl
     ssl._create_default_https_context = ssl._create_unverified_context
     
-    news_api = GNewsDownloader()
-    news_api.headlines()
+    urls = []
+    with SqliteDict('../data/downloaded_articles.db', flag='r') as db:
+        for k in db:
+            urls.append(db[k]['url'])
+    documents = BeautifulSoupWebReader().load_data(urls)
 
-    
+    d = 1536
+    faiss_index = faiss.IndexFlatL2(d)
+    vector_store = FaissVectorStore(faiss_index=faiss_index)
+    storage_context = StorageContext.from_defaults(vector_store=vector_store)
+    vector_store = VectorStoreIndex(documents, storage_context=storage_context)
+    import pdb; pdb.set_trace()
